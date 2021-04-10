@@ -1,5 +1,6 @@
 from tts_tools.libtts import get_fs_path
 from tts_tools.libtts import IllegalSavegameException
+from tts_tools.libtts import NoImageExtensionException
 from tts_tools.libtts import urls_from_save
 from tts_tools.util import print_err
 from tts_tools.util import ZipFile
@@ -57,8 +58,17 @@ def backup_json(args):
     with zipfile as outfile:
 
         for path, url in urls:
+            try:
+                filename = get_fs_path(path, url)
+            except NoImageExtensionException as e:
+                print_err(
+                    "Missing image extension for {} (not found)".format(
+                        e.filename_no_ext
+                    )
+                )
+                if not args.ignore_missing:
+                    sys.exit(1)
 
-            filename = get_fs_path(path, url)
             try:
                 outfile.write(filename)
 

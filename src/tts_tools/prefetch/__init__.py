@@ -8,6 +8,7 @@ from tts_tools.libtts import is_audiolibrary
 from tts_tools.libtts import is_image
 from tts_tools.libtts import is_obj
 from tts_tools.libtts import is_pdf
+from tts_tools.libtts import NoImageExtensionException
 from tts_tools.libtts import urls_from_save
 from tts_tools.util import print_err
 
@@ -141,12 +142,16 @@ def prefetch_file(
             )
             raise ValueError(errstr)
 
-        outfile_name = os.path.join(gamedata_dir, get_fs_path(path, url))
-
-        # Check if the object is already cached.
-        if os.path.isfile(outfile_name) and not refetch:
-            done.add(url)
-            continue
+        try:
+            outfile_name = os.path.join(gamedata_dir, get_fs_path(path, url))
+            missing_ext = False
+            # Check if the object is already cached.
+            if os.path.isfile(outfile_name) and not refetch:
+                done.add(url)
+                continue
+        except NoImageExtensionException as e:
+            missing_ext = True
+            outfile_name_no_ext = os.path.join(gamedata_dir, e.filename_no_ext)
 
         print("{} ".format(url), end="", flush=True)
 
@@ -200,6 +205,23 @@ def prefetch_file(
             sys.exit(1)
 
         try:
+            if missing_ext:
+                content_disposition = response.headers["Content-Disposition"]
+                if (
+                    "jpg" in content_disposition
+                    or "jpeg" in content_disposition
+                ):
+                    extension = ".jpg"
+                elif "png" in content_disposition:
+                    extension = ".png"
+                else:
+                    errmsg = "Error: can't find image extension for {}".format(
+                        url
+                    )
+                    print_err(errmsg)
+                    sys.exit(1)
+                outfile_name = outfile_name_no_ext + extension
+
             with open(outfile_name, "wb") as outfile:
                 outfile.write(response.read())
 
